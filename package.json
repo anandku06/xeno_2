@@ -1,0 +1,23 @@
+{
+  "name": "xeno-crm",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "dev:api": "turbo run dev --filter=crm-api",
+    "dev:stub": "turbo run dev --filter=channel-stub",
+    "dev:frontend": "turbo run dev --filter=crm-frontend",
+    "db:migrate": "turbo run db:migrate --filter=crm-api",
+    "db:seed": "turbo run db:seed --filter=crm-api"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "npm@10.0.0"
+}
