@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { apiFetch } from '@/lib/api';
 
 interface Customer {
@@ -15,11 +15,27 @@ interface Customer {
   last_order_at: string | null;
 }
 
+type ModalTab = 'single' | 'bulk';
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [pagination, setPagination] = useState({ total: 0, limit: 20, offset: 0, hasMore: false });
+
+  // Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [modalTab, setModalTab] = useState<ModalTab>('single');
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
+
+  // Single customer form
+  const [form, setForm] = useState({ name: '', email: '', phone: '', city: '' });
+
+  // Bulk import
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadCustomers = useCallback(async (offset = 0, searchQuery = search) => {
     setLoading(true);
@@ -67,14 +83,132 @@ export default function CustomersPage() {
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   };
 
+  const openModal = () => {
+    setShowModal(true);
+    setFormError('');
+    setFormSuccess('');
+    setForm({ name: '', email: '', phone: '', city: '' });
+    setBulkFile(null);
+    setModalTab('single');
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setFormError('');
+    setFormSuccess('');
+  };
+
+  const handleSingleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setFormSuccess('');
+
+    if (!form.name.trim() || !form.email.trim()) {
+      setFormError('Name and email are required.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiFetch('/customers', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      setFormSuccess('Customer added successfully!');
+      setForm({ name: '', email: '', phone: '', city: '' });
+      loadCustomers(0);
+      setTimeout(() => closeModal(), 1200);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to add customer.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    if (!bulkFile) {
+      setFormError('Please select a CSV file.');
+      return;
+    }
+
+    setFormError('');
+    setFormSuccess('');
+    setSubmitting(true);
+
+    try {
+      const text = await bulkFile.text();
+      const lines = text.split('\n').filter((l) => l.trim());
+
+      if (lines.length < 2) {
+        setFormError('CSV must have a header row and at least one data row.');
+        setSubmitting(false);
+        return;
+      }
+
+      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+      const nameIdx = headers.indexOf('name');
+      const emailIdx = headers.indexOf('email');
+      const phoneIdx = headers.indexOf('phone');
+      const cityIdx = headers.indexOf('city');
+
+      if (nameIdx === -1 || emailIdx === -1) {
+        setFormError('CSV must have "name" and "email" columns.');
+        setSubmitting(false);
+        return;
+      }
+
+      const customers = lines.slice(1).map((line) => {
+        const cols = line.split(',').map((c) => c.trim());
+        return {
+          name: cols[nameIdx] || '',
+          email: cols[emailIdx] || '',
+          phone: phoneIdx !== -1 ? cols[phoneIdx] || '' : '',
+          city: cityIdx !== -1 ? cols[cityIdx] || '' : '',
+        };
+      }).filter((c) => c.name && c.email);
+
+      if (customers.length === 0) {
+        setFormError('No valid customer rows found in CSV.');
+        setSubmitting(false);
+        return;
+      }
+
+      const result = await apiFetch<{ imported: number; errors: number }>('/customers/bulk', {
+        method: 'POST',
+        body: JSON.stringify(customers),
+      });
+
+      setFormSuccess(`Imported ${result.imported} customers${result.errors > 0 ? ` (${result.errors} errors)` : ''}.`);
+      setBulkFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      loadCustomers(0);
+      setTimeout(() => closeModal(), 1500);
+    } catch (err: any) {
+      setFormError(err.message || 'Bulk import failed.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="animate-fade-in">
-        <h1 className="text-3xl font-bold gradient-text inline-block">Customers</h1>
-        <p className="text-[var(--color-text-secondary)] mt-2">
-          {pagination.total} customers in your database
-        </p>
+      <div className="flex items-center justify-between animate-fade-in">
+        <div>
+          <h1 className="text-3xl font-bold gradient-text inline-block">Customers</h1>
+          <p className="text-[var(--color-text-secondary)] mt-2">
+            {pagination.total} customers in your database
+          </p>
+        </div>
+        <button
+          id="add-customer-btn"
+          onClick={openModal}
+          className="px-5 py-2.5 rounded-xl text-white font-medium transition-all duration-200 hover:scale-105 flex items-center gap-2"
+          style={{ background: 'var(--gradient-primary)' }}
+        >
+          <span className="text-lg leading-none">+</span>
+          Add Customer
+        </button>
       </div>
 
       {/* Search Bar */}
@@ -201,6 +335,190 @@ export default function CustomersPage() {
           </div>
         )}
       </div>
+
+      {/* Add Customer Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div
+            className="relative glass rounded-2xl w-full max-w-lg animate-fade-in"
+            style={{ boxShadow: 'var(--shadow-glow)' }}
+          >
+            {/* Close button */}
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card-hover)] transition-colors"
+            >
+              ✕
+            </button>
+
+            <div className="p-6">
+              <h2 className="text-xl font-bold gradient-text inline-block mb-1">Add Customer</h2>
+              <p className="text-sm text-[var(--color-text-muted)] mb-5">Add a single customer or import from CSV</p>
+
+              {/* Tabs */}
+              <div className="flex gap-1 p-1 rounded-xl bg-[var(--color-bg-input)] mb-5">
+                <button
+                  id="tab-single"
+                  onClick={() => { setModalTab('single'); setFormError(''); setFormSuccess(''); }}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    modalTab === 'single'
+                      ? 'text-white shadow-md'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                  style={modalTab === 'single' ? { background: 'var(--gradient-primary)' } : {}}
+                >
+                  Single
+                </button>
+                <button
+                  id="tab-bulk"
+                  onClick={() => { setModalTab('bulk'); setFormError(''); setFormSuccess(''); }}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    modalTab === 'bulk'
+                      ? 'text-white shadow-md'
+                      : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
+                  }`}
+                  style={modalTab === 'bulk' ? { background: 'var(--gradient-primary)' } : {}}
+                >
+                  Bulk CSV
+                </button>
+              </div>
+
+              {/* Error / Success messages */}
+              {formError && (
+                <div className="mb-4 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--color-danger-dim)', color: 'var(--color-danger)' }}>
+                  {formError}
+                </div>
+              )}
+              {formSuccess && (
+                <div className="mb-4 px-4 py-3 rounded-xl text-sm" style={{ background: 'var(--color-success-dim)', color: 'var(--color-success)' }}>
+                  {formSuccess}
+                </div>
+              )}
+
+              {/* Single Customer Form */}
+              {modalTab === 'single' && (
+                <form onSubmit={handleSingleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
+                      Name <span className="text-[var(--color-danger)]">*</span>
+                    </label>
+                    <input
+                      id="customer-name"
+                      type="text"
+                      value={form.name}
+                      onChange={(e) => setForm({ ...form, name: e.target.value })}
+                      placeholder="John Doe"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--color-bg-input)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">
+                      Email <span className="text-[var(--color-danger)]">*</span>
+                    </label>
+                    <input
+                      id="customer-email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      placeholder="john@example.com"
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--color-bg-input)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">Phone</label>
+                      <input
+                        id="customer-phone"
+                        type="text"
+                        value={form.phone}
+                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                        placeholder="+91 98765 43210"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--color-bg-input)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1.5">City</label>
+                      <input
+                        id="customer-city"
+                        type="text"
+                        value={form.city}
+                        onChange={(e) => setForm({ ...form, city: e.target.value })}
+                        placeholder="Mumbai"
+                        className="w-full px-4 py-2.5 rounded-xl bg-[var(--color-bg-input)] border border-[var(--color-border)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:border-[var(--color-accent)] transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    id="submit-customer"
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-3 rounded-xl text-white font-medium transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mt-2"
+                    style={{ background: 'var(--gradient-primary)' }}
+                  >
+                    {submitting ? 'Adding...' : 'Add Customer'}
+                  </button>
+                </form>
+              )}
+
+              {/* Bulk CSV Import */}
+              {modalTab === 'bulk' && (
+                <div className="space-y-4">
+                  <div
+                    className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-8 text-center cursor-pointer hover:border-[var(--color-accent)] transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".csv"
+                      className="hidden"
+                      onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                    />
+                    <div className="text-3xl mb-2">📄</div>
+                    {bulkFile ? (
+                      <div>
+                        <p className="text-sm font-medium text-[var(--color-text-primary)]">{bulkFile.name}</p>
+                        <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                          {(bulkFile.size / 1024).toFixed(1)} KB — Click to change
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-[var(--color-text-secondary)]">Click to upload CSV file</p>
+                        <p className="text-xs text-[var(--color-text-muted)] mt-1">
+                          Required columns: <span className="text-[var(--color-accent-light)]">name</span>, <span className="text-[var(--color-accent-light)]">email</span> · Optional: phone, city
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-4 py-3 rounded-xl text-xs text-[var(--color-text-muted)]" style={{ background: 'var(--color-info-dim)' }}>
+                    <span className="text-[var(--color-info)] font-medium">CSV Format: </span>
+                    name, email, phone, city — one customer per line with a header row.
+                  </div>
+
+                  <button
+                    id="submit-bulk"
+                    onClick={handleBulkSubmit}
+                    disabled={submitting || !bulkFile}
+                    className="w-full py-3 rounded-xl text-white font-medium transition-all duration-200 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    style={{ background: 'var(--gradient-primary)' }}
+                  >
+                    {submitting ? 'Importing...' : `Import${bulkFile ? ` from ${bulkFile.name}` : ''}`}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

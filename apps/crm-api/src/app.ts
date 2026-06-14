@@ -13,6 +13,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const CRM_API_URL = process.env.CRM_API_URL || 'http://localhost:3001';
 
 // Middleware
 app.use(cors());
@@ -35,7 +36,7 @@ app.use('/receipt', receiptRoutes);
 startSendWorker();
 
 app.listen(PORT, () => {
-  console.log(`🚀 CRM API running on http://localhost:${PORT}`);
+  console.log(`🚀 CRM API running on ${CRM_API_URL}`);
 });
 
 export default app;
