@@ -52,7 +52,7 @@ export function buildSegmentQuery(
         const cities = Array.isArray(rule.value) ? rule.value : [rule.value];
         const placeholders = cities.map((_, i) => `$${params.length + i + 1}`);
         whereClauses.push(`LOWER(c.city) IN (${placeholders.join(', ')})`);
-        params.push(...cities.map((c: string) => c.toLowerCase()));
+        params.push(...cities.map((c) => String(c).toLowerCase()));
       } else {
         params.push(typeof rule.value === 'string' ? rule.value.toLowerCase() : rule.value);
         whereClauses.push(`LOWER(c.city) ${sqlOp} $${params.length}`);

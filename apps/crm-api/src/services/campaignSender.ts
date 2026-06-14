@@ -1,16 +1,21 @@
 import { Queue } from 'bullmq';
-import IORedis from 'ioredis';
 import pool from '../db/client';
 import { executeSegmentQuery } from './segmentEngine';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-  maxRetriesPerRequest: null,
-});
+const redisUrl = new URL(process.env.REDIS_URL || 'redis://localhost:6379');
 
-const sendQueue = new Queue('campaign-send', { connection });
+const sendQueue = new Queue('campaign-send', {
+  connection: {
+    host: redisUrl.hostname,
+    port: Number(redisUrl.port) || 6379,
+    password: redisUrl.password || undefined,
+    username: redisUrl.username || undefined,
+    maxRetriesPerRequest: null,
+  },
+});
 
 /**
  * Fan-out campaign to all matched recipients via BullMQ.

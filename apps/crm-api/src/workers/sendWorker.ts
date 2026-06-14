@@ -1,5 +1,4 @@
 import { Worker } from 'bullmq';
-import IORedis from 'ioredis';
 import pool from '../db/client';
 import dotenv from 'dotenv';
 
@@ -10,9 +9,7 @@ dotenv.config();
  * Concurrency set to 5 — would tune based on DB connection pool size at scale.
  */
 export function startSendWorker() {
-  const connection = new IORedis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    maxRetriesPerRequest: null,
-  });
+  const redisUrl = new URL(process.env.REDIS_URL || 'redis://localhost:6379');
 
   const worker = new Worker(
     'campaign-send',
@@ -64,7 +61,13 @@ export function startSendWorker() {
       }
     },
     {
-      connection,
+      connection: {
+        host: redisUrl.hostname,
+        port: Number(redisUrl.port) || 6379,
+        password: redisUrl.password || undefined,
+        username: redisUrl.username || undefined,
+        maxRetriesPerRequest: null,
+      },
       concurrency: 5,
     }
   );
