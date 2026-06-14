@@ -69,8 +69,12 @@ export default function DashboardPage() {
     { label: 'Avg Delivery %', value: `${stats.avgDeliveryRate}%`, icon: '📈', color: 'var(--color-info)' },
   ];
 
-  const channelEmoji: Record<string, string> = {
-    email: '📧', sms: '💬', whatsapp: '💚', rcs: '📱',
+  const channelEmoji: Record<string, React.ReactNode> = {
+    email: '📧',
+    sms: '💬',
+    whatsapp: (
+      <img src="/whatsapp-icon.svg" className="w-5 h-5 inline-block align-middle" alt="WhatsApp" />
+    ),
   };
 
   const statusColor: Record<string, string> = {

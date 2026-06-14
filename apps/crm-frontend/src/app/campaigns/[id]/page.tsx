@@ -126,8 +126,12 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
     );
   }
 
-  const channelEmoji: Record<string, string> = {
-    email: '📧', sms: '💬', whatsapp: '💚', rcs: '📱',
+  const channelEmoji: Record<string, React.ReactNode> = {
+    email: '📧',
+    sms: '💬',
+    whatsapp: (
+      <img src="/whatsapp-icon.svg" className="w-7 h-7 inline-block align-middle" alt="WhatsApp" />
+    ),
   };
 
   const statCards = [

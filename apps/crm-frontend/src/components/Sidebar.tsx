@@ -29,9 +29,8 @@ export default function Sidebar() {
   return (
     <>
       <aside
-        className={`fixed left-0 top-0 h-screen flex flex-col glass transition-all duration-300 ease-in-out ${
-          collapsed ? 'w-[72px]' : 'w-64'
-        }`}
+        className={`fixed left-0 top-0 h-screen flex flex-col glass transition-all duration-300 ease-in-out ${collapsed ? 'w-[72px]' : 'w-64'
+          }`}
         style={{ zIndex: 50 }}
       >
         {/* Toggle button — centered on the right edge */}
@@ -62,7 +61,7 @@ export default function Sidebar() {
             {!collapsed && (
               <div className="overflow-hidden">
                 <h1 className="text-lg font-bold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent-light)] transition-colors whitespace-nowrap">
-                  Xeno CRM
+                  XENO CRM
                 </h1>
                 <p className="text-xs text-[var(--color-text-muted)] whitespace-nowrap">AI Campaign Builder</p>
               </div>

@@ -35,8 +35,13 @@ const OP_LABELS: Record<string, string> = {
 const CHANNELS = [
   { value: 'email', label: 'Email', emoji: '📧' },
   { value: 'sms', label: 'SMS', emoji: '💬' },
-  { value: 'whatsapp', label: 'WhatsApp', emoji: '💚' },
-  { value: 'rcs', label: 'RCS', emoji: '📱' },
+  {
+    value: 'whatsapp',
+    label: 'WhatsApp',
+    emoji: (
+      <img src="/whatsapp-icon.svg" className="w-5 h-5 inline-block align-middle" alt="WhatsApp" />
+    ),
+  },
 ];
 
 export default function NewCampaignPage() {

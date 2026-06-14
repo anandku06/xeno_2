@@ -32,11 +32,16 @@ export default function CampaignsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const channelConfig: Record<string, { emoji: string; label: string; color: string }> = {
+  const channelConfig: Record<string, { emoji: React.ReactNode; label: string; color: string }> = {
     email: { emoji: '📧', label: 'Email', color: 'var(--color-info)' },
     sms: { emoji: '💬', label: 'SMS', color: 'var(--color-success)' },
-    whatsapp: { emoji: '💚', label: 'WhatsApp', color: '#25D366' },
-    rcs: { emoji: '📱', label: 'RCS', color: 'var(--color-accent)' },
+    whatsapp: {
+      emoji: (
+        <img src="/whatsapp-icon.svg" className="w-5 h-5 inline-block align-middle" alt="WhatsApp" />
+      ),
+      label: 'WhatsApp',
+      color: '#25D366',
+    },
   };
 
   const statusConfig: Record<string, { color: string; bg: string }> = {
